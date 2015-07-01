@@ -18,12 +18,12 @@ const kActorQueueLength int = 1
 
 // Synchronously invoke function in the actor's own thread, passing args. Returns the
 // result of execution.
-func (r *Actor) Call(function interface{}, args ...interface{}) []interface{} {
+func (r *Actor) Call(function interface{}, args ...interface{}) ([]interface{}, error) {
 	out := make(chan Response, 0)
 	r.Cast(out, function, args...)
 	response := <-out
 
-	return response.InterpretAsInterfaces()
+	return response.InterpretAsInterfaces(), nil
 }
 
 // GetReceiver is not to be called by user
@@ -88,23 +88,10 @@ func (r *Actor) runInThread(out chan<- Response, receiver reflect.Value, functio
 	r.queue.In <- Request{reflect.ValueOf(function), valuedArgs, out}
 }
 
-func guardedExec(function reflect.Value, args []reflect.Value) (response Response) {
-	/*
-		defer func() {
-			if e := recover(); e != nil {
-				response = ResponseImpl{result: nil, err: e, panicked: true, Stack: debug.Stack(), function: function, args: args}
-			}
-		}()
-	*/
-
-	result := function.Call(args)
-	response = ResponseImpl{result: result, err: nil, panicked: false}
-	return
-}
-
 func (r *Actor) processOneRequest(request Request) {
 	r.current = request.ReplyTo
-	response := guardedExec(request.Function, request.Args)
+	result := request.Function.Call(request.Args)
+	response := ResponseImpl{result: result, err: nil, panicked: false}
 	if request.ReplyTo != nil {
 		request.ReplyTo <- response
 	}

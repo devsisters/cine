@@ -12,12 +12,10 @@ type Phonebook struct {
 }
 
 func (b *Phonebook) Add(name string, number int) {
-	/*
-		if number == 2345 {
-			fmt.Println("panic!")
-			panic("haha panic!")
-		}
-	*/
+	if number == 2344 {
+		fmt.Println("panic!")
+		panic("haha panic!")
+	}
 	b.book[name] = number
 }
 
@@ -53,8 +51,8 @@ func main() {
 	pid := remoteD.StartActor(&book)
 	fmt.Println("pid:", pid)
 	remoteD.Call(pid, (*Phonebook).Add, "Jane", 1234)
-	r := remoteD.Call(pid, (*Phonebook).Lookup, "Jane")[0].(int)
-	fmt.Printf("Lookup('Jane') == %v\n", r)
+	r, err := remoteD.Call(pid, (*Phonebook).Lookup, "Jane")
+	fmt.Printf("Lookup('Jane') == %v\n", r[0].(int))
 
 	d := cinema.NewDirector("127.0.0.1:8080")
 	out := make(chan cinema.Response, 1)
@@ -70,6 +68,10 @@ func main() {
 	out = make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2346)
 
-	r = d.Call(pid, (*Phonebook).Lookup, "Jane")[0].(int)
-	fmt.Printf("(remote) Lookup('Jane') == %v\n", r)
+	r, err = d.Call(pid, (*Phonebook).Lookup, "Jane")
+	if err != nil {
+		fmt.Println("d.Call error:", err)
+	} else {
+		fmt.Printf("(remote) Lookup('Jane') == %v\n", r[0].(int))
+	}
 }

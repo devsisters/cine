@@ -39,7 +39,7 @@ func (r *RemoteActor) createRequest(function interface{}, args ...interface{}) R
 	}
 }
 
-func (r *RemoteActor) Call(function interface{}, args ...interface{}) []interface{} {
+func (r *RemoteActor) Call(function interface{}, args ...interface{}) ([]interface{}, error) {
 	r.initClient()
 	req := r.createRequest(function, args...)
 
@@ -47,7 +47,11 @@ func (r *RemoteActor) Call(function interface{}, args ...interface{}) []interfac
 	call := r.client.Go("DirectorApi.HandleRemoteCall", req, &resp, nil)
 	<-call.Done
 
-	return resp.Return
+	if resp.Err != nil {
+		return nil, resp.Err
+	}
+
+	return resp.Return, nil
 }
 
 func (r *RemoteActor) Cast(out chan<- Response, function interface{}, args ...interface{}) {

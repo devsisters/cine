@@ -1,7 +1,6 @@
 package cinema
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,9 +9,19 @@ import (
 	"time"
 )
 
-var ErrActorNotFound = errors.New("Actor not found")
-var ErrMethodNotFound = errors.New("Method not found")
-var ErrShutdown = errors.New("Actor shutdown")
+type DirectorError struct {
+	Message string
+}
+
+func (e *DirectorError) Error() string {
+	return e.Message
+}
+
+var (
+	ErrActorNotFound  = &DirectorError{"Actor not found"}
+	ErrMethodNotFound = &DirectorError{"Method not found"}
+	ErrShutdown       = &DirectorError{"Actor shutdown"}
+)
 
 type PanicError struct {
 	PanicErr interface{}
@@ -30,13 +39,17 @@ type ActorImplementor interface {
 }
 
 type ActorLike interface {
-	Call(function interface{}, args ...interface{}) []interface{}
+	Call(function interface{}, args ...interface{}) ([]interface{}, error)
 	Cast(out chan<- Response, function interface{}, args ...interface{})
 }
 
 type Pid struct {
 	NodeName string
 	ActorId  int
+}
+
+func (p Pid) String() string {
+	return fmt.Sprintf("<%s,%d>", p.NodeName, p.ActorId)
 }
 
 type Director struct {
@@ -46,6 +59,12 @@ type Director struct {
 	maxActorId int
 	server     *http.Server
 }
+
+/*
+func init() {
+	gob.Register(DirectorError{})
+}
+*/
 
 func NewDirector(nodeName string) *Director {
 	d := &Director{
@@ -128,7 +147,7 @@ func (d *Director) actorFromPid(pid Pid) ActorLike {
 	return d.localActorFromPid(pid)
 }
 
-func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) []interface{} {
+func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, error) {
 	actor := d.actorFromPid(pid)
 	return actor.Call(function, args...)
 }
@@ -149,11 +168,11 @@ type RemoteRequest struct {
 }
 
 type RemoteResponse struct {
-	Err    error
+	Err    *DirectorError
 	Return []interface{}
 }
 
-func (d *DirectorApi) findFun(r RemoteRequest) (interface{}, error) {
+func (d *DirectorApi) findFun(r RemoteRequest) (interface{}, *DirectorError) {
 	actor := d.director.localActorFromPid(r.Pid)
 	if actor == nil {
 		return nil, ErrActorNotFound
@@ -175,7 +194,11 @@ func (d *DirectorApi) HandleRemoteCall(r RemoteRequest, reply *RemoteResponse) e
 		reply.Err = err
 		return nil
 	}
-	ret := d.director.Call(r.Pid, fun, r.Args...)
+	ret, err_ := d.director.Call(r.Pid, fun, r.Args...)
+	if err_ != nil {
+		// Local call should never return an error
+		panic("Call returned error")
+	}
 	reply.Return = ret
 	return nil
 }
