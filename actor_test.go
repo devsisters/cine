@@ -5,10 +5,10 @@ import (
 )
 
 type A struct {
+	Actor
 	x  int
 	y  int
 	in chan GetXRequest
-	Actor
 }
 
 type GetXRequest struct {
@@ -21,39 +21,43 @@ type GetXResponse struct {
 	err interface{}
 }
 
-func (a A) GoX(x int) int {
+func (a *A) GoX(x int) int {
 	out := make(chan GetXResponse)
 	a.in <- GetXRequest{x, out}
 	return (<-out).x
 }
 
-func (a A) ProcessGetX() {
+func (a *A) ProcessGetX() {
 	for {
 		request := <-a.in
 		request.out <- GetXResponse{a.GetX(request.x), nil}
 	}
 }
 
-func (a A) GetX(x int) int {
+func (a *A) GetX(x int) int {
 	return a.x + x
 }
 
-func (a A) DoPanic() int {
+func (a *A) DoPanic() int {
 	panic(a.y)
 }
 
-func TestGetX(t *testing.T) {
-	a := A{2, 3, nil, Actor{}}
-	a.startMessageLoop(a)
+func (a *A) Terminate(errReason error) {
+}
 
-	if x := a.Call(A.GetX, 4)[0].(int); x != 6 {
+func TestGetX(t *testing.T) {
+	a := A{Actor{}, 2, 3, nil}
+	a.startMessageLoop(&a)
+
+	r, _ := a.call((*A).GetX, 4)
+	if x := r[0].(int); x != 6 {
 		t.Errorf("Expected x = %v, actual %v\n", 6, x)
 	}
 }
 
 func TestPanic(t *testing.T) {
-	a := A{2, 3, nil, Actor{}}
-	a.startMessageLoop(a)
+	a := A{Actor{}, 2, 3, nil}
+	a.startMessageLoop(&a)
 
 	defer func() {
 		if e := recover(); e != nil {
@@ -67,22 +71,25 @@ func TestPanic(t *testing.T) {
 		}
 	}()
 
-	a.Call(A.DoPanic)
+	_, err := a.call((*A).DoPanic)
+	if err == nil {
+		t.Errorf("Expected panic, no error returned")
+	}
 }
 
 func BenchmarkActor(b *testing.B) {
 	b.StopTimer()
-	a := A{5, 10, nil, Actor{}}
-	a.startMessageLoop(a)
+	a := A{Actor{}, 5, 10, nil}
+	a.startMessageLoop(&a)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		a.Call(A.GetX, 3)
+		a.call((*A).GetX, 3)
 	}
 }
 
 func BenchmarkChannel(b *testing.B) {
 	b.StopTimer()
-	a := A{5, 10, make(chan GetXRequest), Actor{}}
+	a := A{Actor{}, 5, 10, make(chan GetXRequest)}
 	go a.ProcessGetX()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {

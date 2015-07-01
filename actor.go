@@ -1,6 +1,7 @@
 package cinema
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -14,6 +15,8 @@ type Actor struct {
 	current  chan<- Response
 }
 
+var ErrActorDied = errors.New("Actor died during call")
+
 const kActorQueueLength int = 1
 
 // Synchronously invoke function in the actor's own thread, passing args. Returns the
@@ -21,7 +24,10 @@ const kActorQueueLength int = 1
 func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, error) {
 	out := make(chan Response, 0)
 	r.cast(out, function, args...)
-	response := <-out
+	response, ok := <-out
+	if !ok {
+		return nil, ErrActorDied
+	}
 
 	return response.InterpretAsInterfaces(), nil
 }
@@ -95,6 +101,7 @@ func (r *Actor) processOneRequest(request Request) {
 // Start the internal goroutine that powers this actor. Call this function
 // before calling Do on this object.
 func (r *Actor) startMessageLoop(receiver interface{}) {
+	var lastReq *Request
 	r.queue = NewMessageQueue(kActorQueueLength)
 	r.receiver = reflect.ValueOf(receiver)
 	go func() {
@@ -102,13 +109,20 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 			if e := recover(); e != nil {
 				// Actor panicked
 				errPanic := &PanicError{PanicErr: e}
-				r.director.removeActor(r.pid)
+				if r.director != nil {
+					r.director.removeActor(r.pid)
+				}
 				r.receiver.Interface().(ActorImplementor).Terminate(errPanic)
+				r.queue.In <- Request{reflect.ValueOf((func())(nil)), nil, nil}
+				if lastReq != nil {
+					close(lastReq.ReplyTo)
+				}
 			}
 		}()
 
 		for {
 			request, ok := <-r.queue.Out
+			lastReq = &request
 			if !ok { // The channel's closed
 				return
 			}
