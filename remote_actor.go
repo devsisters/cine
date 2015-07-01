@@ -1,4 +1,4 @@
-package glam
+package cinema
 
 import (
 	"fmt"

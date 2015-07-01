@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"serialx/glam"
+
+	"github.com/devsisters/cinema"
 )
 
 type Phonebook struct {
-	glam.Actor
+	cinema.Actor
 	book map[string]int
 }
 
@@ -30,7 +31,7 @@ func (b *Phonebook) Terminate(errReason error) {
 }
 
 func main() {
-	//book := Phonebook{glam.Actor{}, make(map[string]int)}
+	//book := Phonebook{cinema.Actor{}, make(map[string]int)}
 	//book.StartActor(&book)
 	//book.Call((*Phonebook).Add, "Jane", 1234)
 	//r := book.Call((*Phonebook).Lookup, "Jane")[0].(int)
@@ -38,8 +39,8 @@ func main() {
 	//book.StopActor()
 
 	/*
-		d := glam.NewDirector("127.0.0.1:8080")
-		book := Phonebook{glam.Actor{}, make(map[string]int)}
+		d := cinema.NewDirector("127.0.0.1:8080")
+		book := Phonebook{cinema.Actor{}, make(map[string]int)}
 		pid := d.StartActor(&book)
 		fmt.Println("pid:", pid)
 		d.Call(pid, (*Phonebook).Add, "Jane", 1234)
@@ -47,26 +48,26 @@ func main() {
 		fmt.Printf("Lookup('Jane') == %v\n", r)
 	*/
 
-	remoteD := glam.NewDirector("127.0.0.1:9000")
-	book := Phonebook{glam.Actor{}, make(map[string]int)}
+	remoteD := cinema.NewDirector("127.0.0.1:9000")
+	book := Phonebook{cinema.Actor{}, make(map[string]int)}
 	pid := remoteD.StartActor(&book)
 	fmt.Println("pid:", pid)
 	remoteD.Call(pid, (*Phonebook).Add, "Jane", 1234)
 	r := remoteD.Call(pid, (*Phonebook).Lookup, "Jane")[0].(int)
 	fmt.Printf("Lookup('Jane') == %v\n", r)
 
-	d := glam.NewDirector("127.0.0.1:8080")
-	out := make(chan glam.Response, 1)
+	d := cinema.NewDirector("127.0.0.1:8080")
+	out := make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2341)
-	out = make(chan glam.Response, 1)
+	out = make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2342)
-	out = make(chan glam.Response, 1)
+	out = make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2343)
-	out = make(chan glam.Response, 1)
+	out = make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2344)
-	out = make(chan glam.Response, 1)
+	out = make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2345)
-	out = make(chan glam.Response, 1)
+	out = make(chan cinema.Response, 1)
 	d.Cast(pid, out, (*Phonebook).Add, "Jane", 2346)
 
 	r = d.Call(pid, (*Phonebook).Lookup, "Jane")[0].(int)
