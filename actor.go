@@ -18,20 +18,15 @@ const kActorQueueLength int = 1
 
 // Synchronously invoke function in the actor's own thread, passing args. Returns the
 // result of execution.
-func (r *Actor) Call(function interface{}, args ...interface{}) ([]interface{}, error) {
+func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, error) {
 	out := make(chan Response, 0)
-	r.Cast(out, function, args...)
+	r.cast(out, function, args...)
 	response := <-out
 
 	return response.InterpretAsInterfaces(), nil
 }
 
-// GetReceiver is not to be called by user
-func (r *Actor) GetReceiver() reflect.Value {
-	return r.receiver
-}
-
-func (r *Actor) GetActor() *Actor {
+func (r *Actor) getActor() *Actor {
 	return r
 }
 
@@ -67,7 +62,7 @@ func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 }
 
 // Asynchronously request that the given function be invoked with the given args.
-func (r *Actor) Cast(out chan<- Response, function interface{}, args ...interface{}) {
+func (r *Actor) cast(out chan<- Response, function interface{}, args ...interface{}) {
 	r.verifyCallSignature(function, args)
 	r.runInThread(out, r.receiver, function, args...)
 }

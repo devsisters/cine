@@ -39,7 +39,7 @@ func (r *RemoteActor) createRequest(function interface{}, args ...interface{}) R
 	}
 }
 
-func (r *RemoteActor) Call(function interface{}, args ...interface{}) ([]interface{}, error) {
+func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interface{}, error) {
 	r.initClient()
 	req := r.createRequest(function, args...)
 
@@ -54,7 +54,7 @@ func (r *RemoteActor) Call(function interface{}, args ...interface{}) ([]interfa
 	return resp.Return, nil
 }
 
-func (r *RemoteActor) Cast(out chan<- Response, function interface{}, args ...interface{}) {
+func (r *RemoteActor) cast(out chan<- Response, function interface{}, args ...interface{}) {
 	r.initClient()
 	req := r.createRequest(function, args...)
 

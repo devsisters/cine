@@ -32,15 +32,16 @@ func (e PanicError) Error() string {
 }
 
 type ActorImplementor interface {
-	ActorLike
-	startMessageLoop(receiver interface{})
-	GetActor() *Actor
+	actorLike
 	Terminate(errReason error)
+
+	startMessageLoop(receiver interface{})
+	getActor() *Actor
 }
 
-type ActorLike interface {
-	Call(function interface{}, args ...interface{}) ([]interface{}, error)
-	Cast(out chan<- Response, function interface{}, args ...interface{})
+type actorLike interface {
+	call(function interface{}, args ...interface{}) ([]interface{}, error)
+	cast(out chan<- Response, function interface{}, args ...interface{})
 }
 
 type Pid struct {
@@ -107,7 +108,7 @@ func (d *Director) createPid() Pid {
 }
 
 func (d *Director) StartActor(actorImpl ActorImplementor) Pid {
-	actor := actorImpl.GetActor()
+	actor := actorImpl.getActor()
 	actorImpl.startMessageLoop(actorImpl)
 	d.pidLock.Lock()
 	defer d.pidLock.Unlock()
@@ -140,7 +141,7 @@ func (d *Director) remoteActorFromPid(pid Pid) *RemoteActor {
 	return &RemoteActor{pid: pid}
 }
 
-func (d *Director) actorFromPid(pid Pid) ActorLike {
+func (d *Director) actorFromPid(pid Pid) actorLike {
 	if pid.NodeName != d.nodeName {
 		return d.remoteActorFromPid(pid)
 	}
@@ -149,12 +150,12 @@ func (d *Director) actorFromPid(pid Pid) ActorLike {
 
 func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, error) {
 	actor := d.actorFromPid(pid)
-	return actor.Call(function, args...)
+	return actor.call(function, args...)
 }
 
 func (d *Director) Cast(pid Pid, out chan<- Response, function interface{}, args ...interface{}) {
 	actor := d.actorFromPid(pid)
-	actor.Cast(out, function, args...)
+	actor.cast(out, function, args...)
 }
 
 type DirectorApi struct {
