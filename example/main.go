@@ -13,7 +13,6 @@ type Phonebook struct {
 
 func (b *Phonebook) Add(name string, number int) {
 	if number == 2344 {
-		fmt.Println("panic!")
 		panic("haha panic!")
 	}
 	b.book[name] = number
@@ -74,4 +73,30 @@ func main() {
 	} else {
 		fmt.Printf("(remote) Lookup('Jane') == %v\n", r[0].(int))
 	}
+
+	/*
+		d := cinema.NewDirector("127.0.0.1:8080")
+		book := Phonebook{cinema.Actor{}, make(map[string]int)}
+		pid := d.StartActor(&book)
+		out := make(chan cinema.Response, 1)
+		d.Cast(pid, out, (*Phonebook).Add, "Jane", 2341)
+		out = make(chan cinema.Response, 1)
+		d.Cast(pid, out, (*Phonebook).Add, "Jane", 2342)
+		out = make(chan cinema.Response, 1)
+		d.Cast(pid, out, (*Phonebook).Add, "Jane", 2343)
+		out = make(chan cinema.Response, 1)
+		d.Cast(pid, out, (*Phonebook).Add, "Jane", 2344)
+		out = make(chan cinema.Response, 1)
+		d.Cast(pid, out, (*Phonebook).Add, "Jane", 2345)
+		out = make(chan cinema.Response, 1)
+		d.Cast(pid, out, (*Phonebook).Add, "Jane", 2346)
+
+		r, err := d.Call(pid, (*Phonebook).Lookup, "Jane")
+		fmt.Println("r:", r, "err:", err)
+		if err != nil {
+			fmt.Println("d.Call error:", err)
+		} else {
+			fmt.Printf("(remote) Lookup('Jane') == %v\n", r[0].(int))
+		}
+	*/
 }

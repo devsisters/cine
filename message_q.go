@@ -1,14 +1,13 @@
 package cinema
 
-import (
-	"container/list"
-)
+import "container/list"
 
 type MessageQueue struct {
 	queue *list.List
 	limit int
 	In    chan Request
 	Out   chan Request
+	Stop  chan bool
 }
 
 func NewMessageQueue(limit int) *MessageQueue {
@@ -17,15 +16,13 @@ func NewMessageQueue(limit int) *MessageQueue {
 	q.limit = limit
 	q.In = make(chan Request)
 	q.Out = make(chan Request)
+	q.Stop = make(chan bool)
 	go q.Run()
 	return q
 }
 
 func (q *MessageQueue) processIn(msg Request) bool {
 	if msg.Function.IsNil() {
-		q.drain()
-		close(q.In)
-		close(q.Out)
 		return false
 	}
 	q.queue.PushBack(msg)
@@ -33,7 +30,12 @@ func (q *MessageQueue) processIn(msg Request) bool {
 }
 
 func (q *MessageQueue) doIn() bool {
-	return q.processIn(<-q.In)
+	select {
+	case msg := <-q.In:
+		return q.processIn(msg)
+	case <-q.Stop:
+		return false
+	}
 }
 
 func (q *MessageQueue) doInOut() bool {
@@ -42,27 +44,42 @@ func (q *MessageQueue) doInOut() bool {
 		return q.processIn(msg)
 	case q.Out <- q.queue.Front().Value.(Request):
 		q.queue.Remove(q.queue.Front())
+	case <-q.Stop:
+		return false
 	}
 	return true
 }
 
-func (q *MessageQueue) doOut() {
-	q.Out <- q.queue.Front().Value.(Request)
-	q.queue.Remove(q.queue.Front())
+func (q *MessageQueue) doOut() bool {
+	select {
+	case q.Out <- q.queue.Front().Value.(Request):
+		q.queue.Remove(q.queue.Front())
+	case <-q.Stop:
+		return false
+	}
+	return true
 }
 
 func (q *MessageQueue) Run() {
+	defer func() {
+		q.drain()
+		close(q.In)
+		close(q.Out)
+	}()
+
 	for {
 		if q.queue.Len() == 0 {
 			if !q.doIn() {
-				return
+				break
 			}
 		} else if q.queue.Len() < q.limit {
 			if !q.doInOut() {
-				return
+				break
 			}
 		} else {
-			q.doOut()
+			if !q.doOut() {
+				break
+			}
 		}
 	}
 }
@@ -70,7 +87,8 @@ func (q *MessageQueue) Run() {
 func (q *MessageQueue) drain() {
 	for {
 		select {
-		case <-q.In:
+		case r := <-q.In:
+			close(r.ReplyTo)
 			continue
 		default:
 			return

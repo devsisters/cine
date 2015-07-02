@@ -10,6 +10,7 @@ import (
 )
 
 type RemoteActor struct {
+	actor      Actor
 	pid        Pid
 	client     *rpc.Client
 	clientOnce sync.Once
@@ -39,13 +40,16 @@ func (r *RemoteActor) createRequest(function interface{}, args ...interface{}) R
 	}
 }
 
-func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interface{}, error) {
+func (r *RemoteActor) RemoteCall(function interface{}, args []interface{}) ([]interface{}, error) {
 	r.initClient()
 	req := r.createRequest(function, args...)
 
 	var resp RemoteResponse
 	call := r.client.Go("DirectorApi.HandleRemoteCall", req, &resp, nil)
 	<-call.Done
+	if call.Error != nil {
+		return nil, call.Error
+	}
 
 	if resp.Err != nil {
 		return nil, resp.Err
@@ -54,10 +58,26 @@ func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interfa
 	return resp.Return, nil
 }
 
-func (r *RemoteActor) cast(out chan<- Response, function interface{}, args ...interface{}) {
+func (r *RemoteActor) RemoteCast(out chan<- Response, function interface{}, args []interface{}) {
 	r.initClient()
 	req := r.createRequest(function, args...)
 
 	var resp RemoteRequest
 	r.client.Go("DirectorApi.HandleRemoteCast", req, &resp, nil)
+}
+
+func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
+	ret, err := r.actor.call((*RemoteActor).RemoteCall, function, args)
+	if err != nil {
+		return nil, err
+	}
+	if ret[1] != nil {
+		return nil, ret[1].(*DirectorError)
+	} else {
+		return ret[0].([]interface{}), nil
+	}
+}
+
+func (r *RemoteActor) cast(out chan<- Response, function interface{}, args ...interface{}) {
+	r.actor.cast(out, (*RemoteActor).RemoteCast, out, function, args)
 }

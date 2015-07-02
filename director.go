@@ -18,6 +18,7 @@ func (e *DirectorError) Error() string {
 }
 
 var (
+	ErrActorDied      = &DirectorError{"Actor died"}
 	ErrActorNotFound  = &DirectorError{"Actor not found"}
 	ErrMethodNotFound = &DirectorError{"Method not found"}
 	ErrShutdown       = &DirectorError{"Actor shutdown"}
@@ -40,7 +41,7 @@ type ActorImplementor interface {
 }
 
 type actorLike interface {
-	call(function interface{}, args ...interface{}) ([]interface{}, error)
+	call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError)
 	cast(out chan<- Response, function interface{}, args ...interface{})
 }
 
@@ -57,6 +58,8 @@ type Director struct {
 	nodeName   string
 	pidLock    sync.RWMutex
 	pidMap     map[Pid]*Actor
+	rPidLock   sync.RWMutex
+	rPidMap    map[Pid]*RemoteActor
 	maxActorId int
 	server     *http.Server
 }
@@ -126,35 +129,50 @@ func (d *Director) removeActor(pid Pid) {
 	delete(d.pidMap, pid)
 }
 
-func (d *Director) localActorFromPid(pid Pid) *Actor {
+func (d *Director) localActorFromPid(pid Pid) (*Actor, error) {
 	d.pidLock.RLock()
 	defer d.pidLock.RUnlock()
 
 	actor, ok := d.pidMap[pid]
 	if !ok {
-		return nil
+		return nil, ErrActorNotFound
 	}
-	return actor
+	return actor, nil
 }
 
-func (d *Director) remoteActorFromPid(pid Pid) *RemoteActor {
-	return &RemoteActor{pid: pid}
+func (d *Director) remoteActorFromPid(pid Pid) (*RemoteActor, error) {
+	d.rPidLock.RLock()
+	defer d.rPidLock.RUnlock()
+
+	rActor, ok := d.rPidMap[pid]
+	if !ok {
+		rActor = &RemoteActor{pid: pid}
+		rActor.actor.startMessageLoop(rActor)
+		return rActor, nil
+	}
+	return rActor, nil
 }
 
-func (d *Director) actorFromPid(pid Pid) actorLike {
+func (d *Director) actorFromPid(pid Pid) (actorLike, error) {
 	if pid.NodeName != d.nodeName {
 		return d.remoteActorFromPid(pid)
 	}
 	return d.localActorFromPid(pid)
 }
 
-func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, error) {
-	actor := d.actorFromPid(pid)
+func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
+	actor, err := d.actorFromPid(pid)
+	if err != nil {
+		return nil, ErrActorNotFound
+	}
 	return actor.call(function, args...)
 }
 
 func (d *Director) Cast(pid Pid, out chan<- Response, function interface{}, args ...interface{}) {
-	actor := d.actorFromPid(pid)
+	actor, err := d.actorFromPid(pid)
+	if err != nil {
+		return
+	}
 	actor.cast(out, function, args...)
 }
 
@@ -174,8 +192,8 @@ type RemoteResponse struct {
 }
 
 func (d *DirectorApi) findFun(r RemoteRequest) (interface{}, *DirectorError) {
-	actor := d.director.localActorFromPid(r.Pid)
-	if actor == nil {
+	actor, err := d.director.localActorFromPid(r.Pid)
+	if err != nil {
 		return nil, ErrActorNotFound
 	}
 
@@ -189,23 +207,21 @@ func (d *DirectorApi) findFun(r RemoteRequest) (interface{}, *DirectorError) {
 }
 
 func (d *DirectorApi) HandleRemoteCall(r RemoteRequest, reply *RemoteResponse) error {
-	log.Println("HandleRemoteCall", r)
 	fun, err := d.findFun(r)
 	if err != nil {
 		reply.Err = err
 		return nil
 	}
-	ret, err_ := d.director.Call(r.Pid, fun, r.Args...)
-	if err_ != nil {
-		// Local call should never return an error
-		panic("Call returned error")
+	ret, err := d.director.Call(r.Pid, fun, r.Args...)
+	if err != nil {
+		reply.Err = err
+		return nil
 	}
 	reply.Return = ret
 	return nil
 }
 
 func (d *DirectorApi) HandleRemoteCast(r RemoteRequest, reply *RemoteResponse) error {
-	log.Println("HandleRemoteCast", r)
 	fun, err := d.findFun(r)
 	if err != nil {
 		reply.Err = err
