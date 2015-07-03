@@ -95,6 +95,14 @@ func (r *Actor) processOneRequest(request Request) {
 	}
 }
 
+func (r *Actor) terminateActor(errReason error) {
+	if r.director != nil {
+		r.director.removeActor(r.pid)
+	}
+	r.receiver.Interface().(ActorImplementor).Terminate(errReason)
+	r.queue.Stop <- true
+}
+
 // Start the internal goroutine that powers this actor. Call this function
 // before calling Do on this object.
 func (r *Actor) startMessageLoop(receiver interface{}) {
@@ -106,11 +114,7 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 			if e := recover(); e != nil {
 				// Actor panicked
 				errPanic := &PanicError{PanicErr: e}
-				if r.director != nil {
-					r.director.removeActor(r.pid)
-				}
-				r.receiver.Interface().(ActorImplementor).Terminate(errPanic)
-				r.queue.Stop <- true
+				r.terminateActor(errPanic)
 				if lastReq != nil {
 					close(lastReq.ReplyTo)
 				}
@@ -118,15 +122,20 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 		}()
 
 		for {
-			request := <-r.queue.Out
+			request, ok := <-r.queue.Out
+			if !ok {
+				// The queue is stopped. We should terminate
+				r.terminateActor(ErrActorStop)
+				break
+			}
 			lastReq = &request
 			r.processOneRequest(request)
 		}
 	}()
 }
 
-// TODO(serialx): Develop a novel way to stop an actor (ref: erlang)
-//func (r *Actor) StopActor() {
-//	// Pass nil function pointer to stop the message loop
-//	r.Q.In <- Request{reflect.ValueOf((func())(nil)), nil, nil}
-//}
+func (r *Actor) stop() *DirectorError {
+	// Pass nil function pointer to stop the message loop
+	r.queue.In <- Request{reflect.ValueOf((func())(nil)), nil, nil}
+	return nil
+}

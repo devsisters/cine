@@ -21,7 +21,7 @@ var (
 	ErrActorDied      = &DirectorError{"Actor died"}
 	ErrActorNotFound  = &DirectorError{"Actor not found"}
 	ErrMethodNotFound = &DirectorError{"Method not found"}
-	ErrShutdown       = &DirectorError{"Actor shutdown"}
+	ErrActorStop      = &DirectorError{"Actor stop"}
 )
 
 type PanicError struct {
@@ -43,6 +43,7 @@ type ActorImplementor interface {
 type actorLike interface {
 	call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError)
 	cast(out chan<- Response, function interface{}, args ...interface{})
+	stop() *DirectorError
 }
 
 type Pid struct {
@@ -176,6 +177,15 @@ func (d *Director) Cast(pid Pid, out chan<- Response, function interface{}, args
 	actor.cast(out, function, args...)
 }
 
+func (d *Director) Stop(pid Pid) *DirectorError {
+	actor, err := d.actorFromPid(pid)
+	if err != nil {
+		return ErrActorNotFound
+	}
+	actor.stop()
+	return nil
+}
+
 type DirectorApi struct {
 	director *Director
 }
@@ -229,5 +239,13 @@ func (d *DirectorApi) HandleRemoteCast(r RemoteRequest, reply *RemoteResponse) e
 	}
 	out := make(chan Response, 1)
 	d.director.Cast(r.Pid, out, fun, r.Args...)
+	return nil
+}
+
+func (d *DirectorApi) HandleRemoteStop(r RemoteRequest, reply *RemoteResponse) error {
+	err := d.director.Stop(r.Pid)
+	if err != nil {
+		reply.Err = err
+	}
 	return nil
 }

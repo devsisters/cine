@@ -62,8 +62,22 @@ func (r *RemoteActor) RemoteCast(out chan<- Response, function interface{}, args
 	r.initClient()
 	req := r.createRequest(function, args...)
 
-	var resp RemoteRequest
+	var resp RemoteResponse
 	r.client.Go("DirectorApi.HandleRemoteCast", req, &resp, nil)
+}
+
+func (r *RemoteActor) RemoteStop() *DirectorError {
+	r.initClient()
+	req := RemoteRequest{
+		Pid: r.pid,
+	}
+
+	var resp RemoteResponse
+	r.client.Go("DirectorApi.HandleRemoteCast", req, &resp, nil)
+	if resp.Err != nil {
+		return resp.Err
+	}
+	return nil
 }
 
 func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
@@ -80,4 +94,15 @@ func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interfa
 
 func (r *RemoteActor) cast(out chan<- Response, function interface{}, args ...interface{}) {
 	r.actor.cast(out, (*RemoteActor).RemoteCast, out, function, args)
+}
+
+func (r *RemoteActor) stop() *DirectorError {
+	ret, err := r.actor.call((*RemoteActor).RemoteStop)
+	if err != nil {
+		return err
+	}
+	if ret[0] != nil {
+		return ret[0].(*DirectorError)
+	}
+	return nil
 }
