@@ -1,6 +1,6 @@
-package cinema;
+package cinema
 
-import(
+import (
 	"fmt"
 	"reflect"
 	"runtime"
@@ -11,7 +11,7 @@ import(
 type Request struct {
 	Function reflect.Value
 	Args     []reflect.Value
-	ReplyTo chan<- Response
+	ReplyTo  chan<- Response
 }
 
 type Response interface {
