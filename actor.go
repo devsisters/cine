@@ -48,11 +48,14 @@ func (r *Actor) getActor() *Actor {
 // verifyCallSignature confirms whether the function is callable on the receiver
 func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 	typ := reflect.TypeOf(function)
+	if typ == nil {
+		panic("Function is nil")
+	}
 	if typ.Kind() != reflect.Func {
-		panic("Function is not a method!")
+		panic("Function is not a method")
 	}
 	if typ.NumIn() < 1 {
-		panic("Casted method has no receiver!")
+		panic("Function is not a method. Function has no receiver")
 	}
 	if !r.receiver.Type().AssignableTo(typ.In(0)) {
 		panic(fmt.Sprintf(

@@ -1,6 +1,7 @@
 package cinema
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -134,4 +135,48 @@ func TestPanic(t *testing.T) {
 	if err != ErrActorDied {
 		t.Errorf("Expected ErrActorDied error, instead got %v\n", err)
 	}
+}
+
+func TestGetActor(t *testing.T) {
+	a := TestActor{Actor{}, t, 2, 3, nil, true}
+	if &a.Actor != a.getActor() {
+		t.Errorf("getActor is not same as actor\n")
+	}
+}
+
+func TestVerifyCallSignature(t *testing.T) {
+	a := TestActor{Actor{}, t, 2, 3, nil, true}
+	a.startMessageLoop(&a)
+	defer a.stop()
+
+	testVerify := func(expectedPanic string, function interface{}, args []interface{}) {
+		defer func() {
+			if err := recover(); err != nil {
+				strErr, ok := err.(string)
+				if !ok {
+					t.Errorf("Unexpected panic: %v\n", err)
+					panic(err)
+				} else if !strings.HasPrefix(strErr, expectedPanic) {
+					t.Errorf("Unexpected panic: %v\n", err)
+					panic(err)
+				}
+			} else {
+				t.Errorf("No panic occurred\n")
+			}
+		}()
+		a.verifyCallSignature(function, args)
+	}
+
+	testVerify("Function is nil", nil, nil)
+	testVerify("Function is not a method", 1, nil)
+	lambda := func() {}
+	testVerify("Function is not a method. Function has no receiver", lambda, nil)
+	lambda2 := func(a TestActor) {}
+	testVerify("Cannot assign receiver", lambda2, nil)
+	lambda3 := func(a *TestActor, b int) {}
+	testVerify("Not enough arguments given", lambda3, []interface{}{})
+	testVerify("Too many args for non-variadic function", lambda3, []interface{}{1, 2, 3})
+	lambda4 := func(a *TestActor, bs ...int) {}
+	testVerify("Cannot assign arg 0", lambda3, []interface{}{"a"})
+	a.verifyCallSignature(lambda4, []interface{}{[]int{1, 2, 3, 4}})
 }
