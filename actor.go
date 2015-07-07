@@ -3,22 +3,33 @@ package cinema
 import (
 	"fmt"
 	"reflect"
+	"sync"
 )
 
-// Internal state needed by the Actor.
 type Actor struct {
 	pid      Pid
 	director *Director
 	queue    *MessageQueue
 	receiver reflect.Value
 	current  chan<- Response
+
+	// alive status should be protected with mutex to create memory barrier
+	// because methods like call(), stop() will be called in another thread
+	alive     bool
+	aliveLock sync.Mutex
 }
 
 const kActorQueueLength int = 1
 
-// Synchronously invoke function in the actor's own thread, passing args. Returns the
-// result of execution.
+// call method synchronously calls function in the actor's thread.
 func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
+	r.aliveLock.Lock()
+	if !r.alive {
+		r.aliveLock.Unlock()
+		return nil, ErrActorStop
+	}
+	r.aliveLock.Unlock()
+
 	out := make(chan Response, 0)
 	r.cast(out, function, args...)
 	response, ok := <-out
@@ -29,12 +40,12 @@ func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, 
 	return response.InterpretAsInterfaces(), nil
 }
 
+// getActor used by Director
 func (r *Actor) getActor() *Actor {
 	return r
 }
 
-// Internal method to verify that the given function can be invoked on the actor's
-// receiver with the given args.
+// verifyCallSignature confirms whether the function is callable on the receiver
 func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 	typ := reflect.TypeOf(function)
 	if typ.Kind() != reflect.Func {
@@ -64,15 +75,24 @@ func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 	}
 }
 
-// Asynchronously request that the given function be invoked with the given args.
+// cast method asynchronously calls function in the actor's thread. This function does
+// not return anything. Errors or panic caused by the function is not passed to the
+// caller.
 func (r *Actor) cast(out chan<- Response, function interface{}, args ...interface{}) {
+	r.aliveLock.Lock()
+	if !r.alive {
+		r.aliveLock.Unlock()
+		return
+	}
+	r.aliveLock.Unlock()
+
 	r.verifyCallSignature(function, args)
 	r.runInThread(out, r.receiver, function, args...)
 }
 
 func (r *Actor) runInThread(out chan<- Response, receiver reflect.Value, function interface{}, args ...interface{}) {
 	if r.queue == nil {
-		panic("Call StartActor before sending it messages!")
+		panic("Call startMessageLoop before sending it messages!")
 	}
 
 	// reflect.Call expects the arguments to be a slice of reflect.Values. We also
@@ -95,19 +115,30 @@ func (r *Actor) processOneRequest(request Request) {
 	}
 }
 
+// terminateActor terminates the actor. Should be only called within actor thread
 func (r *Actor) terminateActor(errReason error) {
 	if r.director != nil {
 		r.director.removeActor(r.pid)
 	}
-	r.receiver.Interface().(ActorImplementor).Terminate(errReason)
+
+	r.aliveLock.Lock()
+	r.alive = false
 	r.queue.Stop <- true
+	r.aliveLock.Unlock()
+
+	r.receiver.Interface().(ActorImplementor).Terminate(errReason)
 }
 
-// Start the internal goroutine that powers this actor. Call this function
-// before calling Do on this object.
+// startMessageLoop starts the actor thread.
+// This must be called before any actor calls and casts.
 func (r *Actor) startMessageLoop(receiver interface{}) {
 	r.queue = NewMessageQueue(kActorQueueLength)
 	r.receiver = reflect.ValueOf(receiver)
+
+	r.aliveLock.Lock()
+	r.alive = true
+	r.aliveLock.Unlock()
+
 	go func() {
 		var lastReq *Request
 		defer func() {
@@ -134,8 +165,14 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 	}()
 }
 
+// stop stops the actor thread.
 func (r *Actor) stop() *DirectorError {
-	// Pass nil function pointer to stop the message loop
-	r.queue.In <- Request{reflect.ValueOf((func())(nil)), nil, nil}
+	r.aliveLock.Lock()
+	defer r.aliveLock.Unlock()
+	if r.alive {
+		// Pass nil function pointer to stop the message loop
+		r.queue.In <- Request{reflect.ValueOf((func())(nil)), nil, nil}
+		r.alive = false
+	}
 	return nil
 }

@@ -12,6 +12,9 @@ type TestActor struct {
 
 	// For BenchmarkChannel test
 	in chan AddXRequest
+
+	// For TestPanic test
+	shouldStopNormally bool
 }
 
 // For BenchmarkChannel test
@@ -49,12 +52,20 @@ func (a *TestActor) DoPanic() int {
 }
 
 func (a *TestActor) Terminate(errReason error) {
-	panicErr, ok := errReason.(*PanicError)
-	if !ok {
-		a.t.Errorf("Expected PanicError but got %v\n", errReason)
-	}
-	if panicErr.PanicErr.(int) != a.y {
-		a.t.Errorf("Expected PanicError value to be %v but got %v\n", a.y, panicErr.PanicErr)
+	if a.shouldStopNormally {
+		if errReason != ErrActorStop {
+			a.t.Errorf("Expected ErrActorStop but got %v\n", errReason)
+		}
+	} else {
+		panicErr, ok := errReason.(*PanicError)
+		if ok {
+			if panicErr.PanicErr.(int) != a.y {
+				a.t.Errorf("Expected PanicError value to be %v but got %v\n", a.y, panicErr.PanicErr)
+			}
+			return
+		} else {
+			a.t.Errorf("Expected PanicError but got %v\n", errReason)
+		}
 	}
 }
 
@@ -63,7 +74,7 @@ func (a *TestActor) AddX(x int) int {
 }
 
 func BenchmarkChannel(b *testing.B) {
-	a := TestActor{Actor{}, nil, 5, 10, make(chan AddXRequest)}
+	a := TestActor{Actor{}, nil, 5, 10, make(chan AddXRequest), true}
 	go a.ProcessAddX()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -73,8 +84,9 @@ func BenchmarkChannel(b *testing.B) {
 }
 
 func BenchmarkActor(b *testing.B) {
-	a := TestActor{Actor{}, nil, 5, 10, nil}
+	a := TestActor{Actor{}, nil, 5, 10, nil, true}
 	a.startMessageLoop(&a)
+	defer a.stop()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		a.call((*TestActor).AddX, 3)
@@ -82,8 +94,9 @@ func BenchmarkActor(b *testing.B) {
 }
 
 func TestAddX(t *testing.T) {
-	a := TestActor{Actor{}, t, 2, 3, nil}
+	a := TestActor{Actor{}, t, 2, 3, nil, true}
 	a.startMessageLoop(&a)
+	defer a.stop()
 
 	r, err := a.call((*TestActor).AddX, 4)
 	if err != nil {
@@ -95,11 +108,27 @@ func TestAddX(t *testing.T) {
 	if x := r[0].(int); x != 6 {
 		t.Errorf("Expected x = %v, actual %v\n", 6, x)
 	}
+
+	// Stop the actor and see the behaviour after stop
+	a.stop()
+
+	r, err = a.call((*TestActor).AddX, 4)
+	if err != ErrActorStop {
+		t.Errorf("Expected ErrActorStop error, got %v\n", err)
+	}
+	if r != nil {
+		t.Errorf("Expected null return value, got %v result\n", r)
+	}
+
+	// cast should success without any errors
+	out := make(chan Response, 1)
+	a.cast(out, (*TestActor).AddX, 4)
 }
 
 func TestPanic(t *testing.T) {
-	a := TestActor{Actor{}, t, 2, 3, nil}
+	a := TestActor{Actor{}, t, 2, 3, nil, false}
 	a.startMessageLoop(&a)
+	defer a.stop()
 
 	_, err := a.call((*TestActor).DoPanic)
 	if err != ErrActorDied {
