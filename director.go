@@ -86,22 +86,17 @@ type Director struct {
 	nodeName   string
 	pidLock    sync.RWMutex
 	pidMap     map[Pid]*Actor
-	rPidLock   sync.RWMutex
-	rPidMap    map[Pid]*RemoteActor
+	clientLock sync.Mutex
+	clientMap  map[string]*rpc.Client
 	maxActorId int
 	server     *http.Server
 }
-
-/*
-func init() {
-	gob.Register(DirectorError{})
-}
-*/
 
 func NewDirector(nodeName string) *Director {
 	d := &Director{
 		nodeName:   nodeName,
 		pidMap:     make(map[Pid]*Actor),
+		clientMap:  make(map[string]*rpc.Client),
 		maxActorId: 0,
 	}
 	d.startServer()
@@ -150,6 +145,13 @@ func (d *Director) StartActor(actorImpl ActorImplementor) Pid {
 	return pid
 }
 
+func (d *Director) removeClient(pid Pid) {
+	d.clientLock.Lock()
+	defer d.clientLock.Unlock()
+
+	delete(d.clientMap, pid.NodeName)
+}
+
 func (d *Director) removeActor(pid Pid) {
 	d.pidLock.Lock()
 	defer d.pidLock.Unlock()
@@ -169,14 +171,24 @@ func (d *Director) localActorFromPid(pid Pid) (*Actor, error) {
 }
 
 func (d *Director) remoteActorFromPid(pid Pid) (*RemoteActor, error) {
-	d.rPidLock.RLock()
-	defer d.rPidLock.RUnlock()
-
-	rActor, ok := d.rPidMap[pid]
+	d.clientLock.Lock()
+	client, ok := d.clientMap[pid.NodeName]
+	d.clientLock.Unlock()
+	// It's okay that we override client due to race condition
 	if !ok {
-		rActor = &RemoteActor{pid: pid}
-		rActor.actor.startMessageLoop(rActor)
-		return rActor, nil
+		var err error
+		client, err = rpc.DialHTTP("tcp", pid.NodeName)
+		if err != nil {
+			return nil, err
+		}
+		d.clientLock.Lock()
+		d.clientMap[pid.NodeName] = client
+		d.clientLock.Unlock()
+	}
+	rActor := &RemoteActor{
+		pid:      pid,
+		client:   client,
+		director: d,
 	}
 	return rActor, nil
 }
@@ -188,6 +200,9 @@ func (d *Director) actorFromPid(pid Pid) (actorLike, error) {
 	return d.localActorFromPid(pid)
 }
 
+// Call method calls the function on the pid actors goroutine.
+// ErrActorNotFound can be returned if pid does not exist or remote node is
+// unavailable.
 func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
 	actor, err := d.actorFromPid(pid)
 	if err != nil {

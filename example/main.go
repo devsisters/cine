@@ -53,7 +53,7 @@ func main() {
 	r, err := remoteD.Call(pid, (*Phonebook).Lookup, "Jane")
 	fmt.Printf("Lookup('Jane') == %v\n", r[0].(int))
 
-	d := cine.NewDirector("127.0.0.1:8080")
+	d := cine.NewDirector("127.0.0.1:9001")
 	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2341)
 	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2342)
 	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2343)
