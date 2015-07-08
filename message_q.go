@@ -5,8 +5,8 @@ import "container/list"
 type MessageQueue struct {
 	queue *list.List
 	limit int
-	In    chan *Call
-	Out   chan *Call
+	In    chan *ActorCall
+	Out   chan *ActorCall
 	Stop  chan bool
 }
 
@@ -14,14 +14,14 @@ func NewMessageQueue(limit int) *MessageQueue {
 	q := new(MessageQueue)
 	q.queue = list.New()
 	q.limit = limit
-	q.In = make(chan *Call)
-	q.Out = make(chan *Call)
+	q.In = make(chan *ActorCall)
+	q.Out = make(chan *ActorCall)
 	q.Stop = make(chan bool)
 	go q.Run()
 	return q
 }
 
-func (q *MessageQueue) processIn(msg *Call) bool {
+func (q *MessageQueue) processIn(msg *ActorCall) bool {
 	if msg.Function.IsNil() {
 		return false
 	}
@@ -42,7 +42,7 @@ func (q *MessageQueue) doInOut() bool {
 	select {
 	case msg := <-q.In:
 		return q.processIn(msg)
-	case q.Out <- q.queue.Front().Value.(*Call):
+	case q.Out <- q.queue.Front().Value.(*ActorCall):
 		q.queue.Remove(q.queue.Front())
 	case <-q.Stop:
 		return false
@@ -52,7 +52,7 @@ func (q *MessageQueue) doInOut() bool {
 
 func (q *MessageQueue) doOut() bool {
 	select {
-	case q.Out <- q.queue.Front().Value.(*Call):
+	case q.Out <- q.queue.Front().Value.(*ActorCall):
 		q.queue.Remove(q.queue.Front())
 	case <-q.Stop:
 		return false

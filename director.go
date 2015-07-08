@@ -9,8 +9,35 @@ import (
 	"time"
 )
 
+var DefaultDirector *Director
+
+func Init(nodeName string) {
+	DefaultDirector = NewDirector(nodeName)
+}
+
 type DirectorError struct {
 	Message string
+}
+
+func Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
+	if DefaultDirector == nil {
+		panic("DefaultDirector not initialized. Call cine.Init first.")
+	}
+	return DefaultDirector.Call(pid, function, args...)
+}
+
+func Cast(pid Pid, done chan *ActorCall, function interface{}, args ...interface{}) {
+	if DefaultDirector == nil {
+		panic("DefaultDirector not initialized. Call cine.Init first.")
+	}
+	DefaultDirector.Cast(pid, done, function, args...)
+}
+
+func Stop(pid Pid) *DirectorError {
+	if DefaultDirector == nil {
+		panic("DefaultDirector not initialized. Call cine.Init first.")
+	}
+	return DefaultDirector.Stop(pid)
 }
 
 func (e *DirectorError) Error() string {
@@ -42,7 +69,7 @@ type ActorImplementor interface {
 
 type actorLike interface {
 	call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError)
-	cast(done chan *Call, function interface{}, args ...interface{})
+	cast(done chan *ActorCall, function interface{}, args ...interface{})
 	stop() *DirectorError
 }
 
@@ -169,7 +196,7 @@ func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]i
 	return actor.call(function, args...)
 }
 
-func (d *Director) Cast(pid Pid, done chan *Call, function interface{}, args ...interface{}) {
+func (d *Director) Cast(pid Pid, done chan *ActorCall, function interface{}, args ...interface{}) {
 	actor, err := d.actorFromPid(pid)
 	if err != nil {
 		return
@@ -237,7 +264,7 @@ func (d *DirectorApi) HandleRemoteCast(r RemoteRequest, reply *RemoteResponse) e
 		reply.Err = err
 		return nil
 	}
-	done := make(chan *Call, 1)
+	done := make(chan *ActorCall, 1)
 	d.director.Cast(r.Pid, done, fun, r.Args...)
 	return nil
 }

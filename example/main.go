@@ -54,12 +54,12 @@ func main() {
 	fmt.Printf("Lookup('Jane') == %v\n", r[0].(int))
 
 	d := cine.NewDirector("127.0.0.1:8080")
-	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2341)
-	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2342)
-	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2343)
-	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2344)
-	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2345)
-	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2346)
+	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2341)
+	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2342)
+	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2343)
+	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2344)
+	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2345)
+	d.Cast(pid, make(chan *cine.ActorCall, 1), (*Phonebook).Add, "Jane", 2346)
 
 	r, err = d.Call(pid, (*Phonebook).Lookup, "Jane")
 	if err != nil {

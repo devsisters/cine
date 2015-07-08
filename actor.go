@@ -29,7 +29,7 @@ func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, 
 	}
 	r.aliveLock.Unlock()
 
-	done := make(chan *Call, 0)
+	done := make(chan *ActorCall, 0)
 	r.cast(done, function, args...)
 	response, ok := <-done
 	if !ok {
@@ -80,7 +80,7 @@ func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 // cast method asynchronously calls function in the actor's thread. This function does
 // not return anything. Errors or panic caused by the function is not passed to the
 // caller.
-func (r *Actor) cast(done chan *Call, function interface{}, args ...interface{}) {
+func (r *Actor) cast(done chan *ActorCall, function interface{}, args ...interface{}) {
 	r.aliveLock.Lock()
 	if !r.alive {
 		r.aliveLock.Unlock()
@@ -92,7 +92,7 @@ func (r *Actor) cast(done chan *Call, function interface{}, args ...interface{})
 	r.runInThread(done, r.receiver, function, args...)
 }
 
-func (r *Actor) runInThread(done chan *Call, receiver reflect.Value, function interface{}, args ...interface{}) {
+func (r *Actor) runInThread(done chan *ActorCall, receiver reflect.Value, function interface{}, args ...interface{}) {
 	if r.queue == nil {
 		panic("Call startMessageLoop before sending it messages!")
 	}
@@ -105,10 +105,10 @@ func (r *Actor) runInThread(done chan *Call, receiver reflect.Value, function in
 		valuedArgs[i+1] = reflect.ValueOf(x)
 	}
 
-	r.queue.In <- &Call{reflect.ValueOf(function), valuedArgs, nil, done}
+	r.queue.In <- &ActorCall{reflect.ValueOf(function), valuedArgs, nil, done}
 }
 
-func (r *Actor) processOneRequest(request *Call) {
+func (r *Actor) processOneRequest(request *ActorCall) {
 	request.Reply = request.Function.Call(request.Args)
 	if request.Done != nil {
 		request.Done <- request
@@ -140,7 +140,7 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 	r.aliveLock.Unlock()
 
 	go func() {
-		var lastCall *Call
+		var lastCall *ActorCall
 		defer func() {
 			if e := recover(); e != nil {
 				// Actor panicked
@@ -171,7 +171,7 @@ func (r *Actor) stop() *DirectorError {
 	defer r.aliveLock.Unlock()
 	if r.alive {
 		// Pass nil function pointer to stop the message loop
-		r.queue.In <- &Call{reflect.ValueOf((func())(nil)), nil, nil, nil}
+		r.queue.In <- &ActorCall{reflect.ValueOf((func())(nil)), nil, nil, nil}
 		r.alive = false
 	}
 	return nil
