@@ -1,4 +1,4 @@
-package cinema
+package cine
 
 import (
 	"strings"
