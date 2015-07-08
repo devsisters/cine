@@ -58,7 +58,7 @@ func (r *RemoteActor) RemoteCall(function interface{}, args []interface{}) ([]in
 	return resp.Return, nil
 }
 
-func (r *RemoteActor) RemoteCast(out chan<- Response, function interface{}, args []interface{}) {
+func (r *RemoteActor) RemoteCast(done chan *Call, function interface{}, args []interface{}) {
 	r.initClient()
 	req := r.createRequest(function, args...)
 
@@ -92,8 +92,8 @@ func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interfa
 	}
 }
 
-func (r *RemoteActor) cast(out chan<- Response, function interface{}, args ...interface{}) {
-	r.actor.cast(out, (*RemoteActor).RemoteCast, out, function, args)
+func (r *RemoteActor) cast(done chan *Call, function interface{}, args ...interface{}) {
+	r.actor.cast(done, (*RemoteActor).RemoteCast, done, function, args)
 }
 
 func (r *RemoteActor) stop() *DirectorError {

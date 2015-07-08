@@ -11,7 +11,6 @@ type Actor struct {
 	director *Director
 	queue    *MessageQueue
 	receiver reflect.Value
-	current  chan<- Response
 
 	// alive status should be protected with mutex to create memory barrier
 	// because methods like call(), stop() will be called in another thread
@@ -30,14 +29,14 @@ func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, 
 	}
 	r.aliveLock.Unlock()
 
-	out := make(chan Response, 0)
-	r.cast(out, function, args...)
-	response, ok := <-out
+	done := make(chan *Call, 0)
+	r.cast(done, function, args...)
+	response, ok := <-done
 	if !ok {
 		return nil, ErrActorDied
 	}
 
-	return response.InterpretAsInterfaces(), nil
+	return response.ReplyAsInterfaces(), nil
 }
 
 // getActor used by Director
@@ -81,7 +80,7 @@ func (r *Actor) verifyCallSignature(function interface{}, args []interface{}) {
 // cast method asynchronously calls function in the actor's thread. This function does
 // not return anything. Errors or panic caused by the function is not passed to the
 // caller.
-func (r *Actor) cast(out chan<- Response, function interface{}, args ...interface{}) {
+func (r *Actor) cast(done chan *Call, function interface{}, args ...interface{}) {
 	r.aliveLock.Lock()
 	if !r.alive {
 		r.aliveLock.Unlock()
@@ -90,10 +89,10 @@ func (r *Actor) cast(out chan<- Response, function interface{}, args ...interfac
 	r.aliveLock.Unlock()
 
 	r.verifyCallSignature(function, args)
-	r.runInThread(out, r.receiver, function, args...)
+	r.runInThread(done, r.receiver, function, args...)
 }
 
-func (r *Actor) runInThread(out chan<- Response, receiver reflect.Value, function interface{}, args ...interface{}) {
+func (r *Actor) runInThread(done chan *Call, receiver reflect.Value, function interface{}, args ...interface{}) {
 	if r.queue == nil {
 		panic("Call startMessageLoop before sending it messages!")
 	}
@@ -106,15 +105,13 @@ func (r *Actor) runInThread(out chan<- Response, receiver reflect.Value, functio
 		valuedArgs[i+1] = reflect.ValueOf(x)
 	}
 
-	r.queue.In <- Request{reflect.ValueOf(function), valuedArgs, out}
+	r.queue.In <- &Call{reflect.ValueOf(function), valuedArgs, nil, done}
 }
 
-func (r *Actor) processOneRequest(request Request) {
-	r.current = request.ReplyTo
-	result := request.Function.Call(request.Args)
-	response := ResponseImpl{result: result, err: nil, panicked: false}
-	if request.ReplyTo != nil {
-		request.ReplyTo <- response
+func (r *Actor) processOneRequest(request *Call) {
+	request.Reply = request.Function.Call(request.Args)
+	if request.Done != nil {
+		request.Done <- request
 	}
 }
 
@@ -143,27 +140,27 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 	r.aliveLock.Unlock()
 
 	go func() {
-		var lastReq *Request
+		var lastCall *Call
 		defer func() {
 			if e := recover(); e != nil {
 				// Actor panicked
 				errPanic := &PanicError{PanicErr: e}
 				r.terminateActor(errPanic)
-				if lastReq != nil {
-					close(lastReq.ReplyTo)
+				if lastCall != nil {
+					close(lastCall.Done)
 				}
 			}
 		}()
 
 		for {
-			request, ok := <-r.queue.Out
+			call, ok := <-r.queue.Out
 			if !ok {
 				// The queue is stopped. We should terminate
 				r.terminateActor(ErrActorStop)
 				break
 			}
-			lastReq = &request
-			r.processOneRequest(request)
+			lastCall = call
+			r.processOneRequest(call)
 		}
 	}()
 }
@@ -174,7 +171,7 @@ func (r *Actor) stop() *DirectorError {
 	defer r.aliveLock.Unlock()
 	if r.alive {
 		// Pass nil function pointer to stop the message loop
-		r.queue.In <- Request{reflect.ValueOf((func())(nil)), nil, nil}
+		r.queue.In <- &Call{reflect.ValueOf((func())(nil)), nil, nil, nil}
 		r.alive = false
 	}
 	return nil

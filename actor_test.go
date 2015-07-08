@@ -122,7 +122,7 @@ func TestAddX(t *testing.T) {
 	}
 
 	// cast should success without any errors
-	out := make(chan Response, 1)
+	out := make(chan *Call, 1)
 	a.cast(out, (*TestActor).AddX, 4)
 }
 

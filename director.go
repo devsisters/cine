@@ -42,7 +42,7 @@ type ActorImplementor interface {
 
 type actorLike interface {
 	call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError)
-	cast(out chan<- Response, function interface{}, args ...interface{})
+	cast(done chan *Call, function interface{}, args ...interface{})
 	stop() *DirectorError
 }
 
@@ -169,12 +169,12 @@ func (d *Director) Call(pid Pid, function interface{}, args ...interface{}) ([]i
 	return actor.call(function, args...)
 }
 
-func (d *Director) Cast(pid Pid, out chan<- Response, function interface{}, args ...interface{}) {
+func (d *Director) Cast(pid Pid, done chan *Call, function interface{}, args ...interface{}) {
 	actor, err := d.actorFromPid(pid)
 	if err != nil {
 		return
 	}
-	actor.cast(out, function, args...)
+	actor.cast(done, function, args...)
 }
 
 func (d *Director) Stop(pid Pid) *DirectorError {
@@ -237,8 +237,8 @@ func (d *DirectorApi) HandleRemoteCast(r RemoteRequest, reply *RemoteResponse) e
 		reply.Err = err
 		return nil
 	}
-	out := make(chan Response, 1)
-	d.director.Cast(r.Pid, out, fun, r.Args...)
+	done := make(chan *Call, 1)
+	d.director.Cast(r.Pid, done, fun, r.Args...)
 	return nil
 }
 
