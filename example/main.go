@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/devsisters/cinema"
+	"github.com/devsisters/cine"
 )
 
 type Phonebook struct {
-	cinema.Actor
+	cine.Actor
 	book map[string]int
 }
 
@@ -28,7 +28,7 @@ func (b *Phonebook) Terminate(errReason error) {
 }
 
 func main() {
-	//book := Phonebook{cinema.Actor{}, make(map[string]int)}
+	//book := Phonebook{cine.Actor{}, make(map[string]int)}
 	//book.StartActor(&book)
 	//book.Call((*Phonebook).Add, "Jane", 1234)
 	//r := book.Call((*Phonebook).Lookup, "Jane")[0].(int)
@@ -36,8 +36,8 @@ func main() {
 	//book.StopActor()
 
 	/*
-		d := cinema.NewDirector("127.0.0.1:8080")
-		book := Phonebook{cinema.Actor{}, make(map[string]int)}
+		d := cine.NewDirector("127.0.0.1:8080")
+		book := Phonebook{cine.Actor{}, make(map[string]int)}
 		pid := d.StartActor(&book)
 		fmt.Println("pid:", pid)
 		d.Call(pid, (*Phonebook).Add, "Jane", 1234)
@@ -45,21 +45,21 @@ func main() {
 		fmt.Printf("Lookup('Jane') == %v\n", r)
 	*/
 
-	remoteD := cinema.NewDirector("127.0.0.1:9000")
-	book := Phonebook{cinema.Actor{}, make(map[string]int)}
+	remoteD := cine.NewDirector("127.0.0.1:9000")
+	book := Phonebook{cine.Actor{}, make(map[string]int)}
 	pid := remoteD.StartActor(&book)
 	fmt.Println("pid:", pid)
 	remoteD.Call(pid, (*Phonebook).Add, "Jane", 1234)
 	r, err := remoteD.Call(pid, (*Phonebook).Lookup, "Jane")
 	fmt.Printf("Lookup('Jane') == %v\n", r[0].(int))
 
-	d := cinema.NewDirector("127.0.0.1:8080")
-	d.Cast(pid, make(chan *cinema.Call, 1), (*Phonebook).Add, "Jane", 2341)
-	d.Cast(pid, make(chan *cinema.Call, 1), (*Phonebook).Add, "Jane", 2342)
-	d.Cast(pid, make(chan *cinema.Call, 1), (*Phonebook).Add, "Jane", 2343)
-	d.Cast(pid, make(chan *cinema.Call, 1), (*Phonebook).Add, "Jane", 2344)
-	d.Cast(pid, make(chan *cinema.Call, 1), (*Phonebook).Add, "Jane", 2345)
-	d.Cast(pid, make(chan *cinema.Call, 1), (*Phonebook).Add, "Jane", 2346)
+	d := cine.NewDirector("127.0.0.1:8080")
+	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2341)
+	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2342)
+	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2343)
+	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2344)
+	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2345)
+	d.Cast(pid, make(chan *cine.Call, 1), (*Phonebook).Add, "Jane", 2346)
 
 	r, err = d.Call(pid, (*Phonebook).Lookup, "Jane")
 	if err != nil {
@@ -69,20 +69,20 @@ func main() {
 	}
 
 	/*
-		d := cinema.NewDirector("127.0.0.1:8080")
-		book := Phonebook{cinema.Actor{}, make(map[string]int)}
+		d := cine.NewDirector("127.0.0.1:8080")
+		book := Phonebook{cine.Actor{}, make(map[string]int)}
 		pid := d.StartActor(&book)
-		done := make(chan *cinema.Call, 1)
+		done := make(chan *cine.Call, 1)
 		d.Cast(pid, done, (*Phonebook).Add, "Jane", 2341)
-		done = make(chan *cinema.Call, 1)
+		done = make(chan *cine.Call, 1)
 		d.Cast(pid, done, (*Phonebook).Add, "Jane", 2342)
-		done = make(chan *cinema.Call, 1)
+		done = make(chan *cine.Call, 1)
 		d.Cast(pid, done, (*Phonebook).Add, "Jane", 2343)
-		done = make(chan *cinema.Call, 1)
+		done = make(chan *cine.Call, 1)
 		d.Cast(pid, done, (*Phonebook).Add, "Jane", 2344)
-		done = make(chan *cinema.Call, 1)
+		done = make(chan *cine.Call, 1)
 		d.Cast(pid, done, (*Phonebook).Add, "Jane", 2345)
-		done = make(chan *cinema.Call, 1)
+		done = make(chan *cine.Call, 1)
 		d.Cast(pid, done, (*Phonebook).Add, "Jane", 2346)
 
 		r, err := d.Call(pid, (*Phonebook).Lookup, "Jane")
