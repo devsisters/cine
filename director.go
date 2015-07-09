@@ -1,6 +1,7 @@
 package cine
 
 import (
+	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +11,10 @@ import (
 )
 
 var DefaultDirector *Director
+
+func init() {
+	gob.Register(Pid{})
+}
 
 func Init(nodeName string) {
 	DefaultDirector = NewDirector(nodeName)
@@ -188,9 +193,13 @@ func (d *Director) remoteActorFromPid(pid Pid) (*RemoteActor, error) {
 		if err != nil {
 			return nil, err
 		}
-		d.clientLock.Lock()
-		d.clientMap[pid.NodeName] = client
-		d.clientLock.Unlock()
+		// TODO(serialx): We don't cache the client connections for now.
+		// The reason is that client connection closes after the ReadTimeout/
+		// WriteTimeout	which is currently 10 seconds. We need to manage that
+		// before we can reliably cache the client connections.
+		//d.clientLock.Lock()
+		//d.clientMap[pid.NodeName] = client
+		//d.clientLock.Unlock()
 	}
 	rActor := &RemoteActor{
 		pid:      pid,
