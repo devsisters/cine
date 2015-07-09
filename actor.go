@@ -14,8 +14,10 @@ type Actor struct {
 
 	// alive status should be protected with mutex to create memory barrier
 	// because methods like call(), stop() will be called in another thread
-	alive     bool
 	aliveLock sync.Mutex
+	alive     bool
+
+	shutdownCh chan bool
 }
 
 const kActorQueueLength int = 1
@@ -134,6 +136,7 @@ func (r *Actor) terminateActor(errReason error) {
 func (r *Actor) startMessageLoop(receiver interface{}) {
 	r.queue = NewMessageQueue(kActorQueueLength)
 	r.receiver = reflect.ValueOf(receiver)
+	r.shutdownCh = make(chan bool)
 
 	r.aliveLock.Lock()
 	r.alive = true
@@ -153,14 +156,18 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 		}()
 
 		for {
-			call, ok := <-r.queue.Out
-			if !ok {
-				// The queue is stopped. We should terminate
+			select {
+			case call, ok := <-r.queue.Out:
+				if !ok {
+					// The queue is stopped. We should terminate
+					r.terminateActor(ErrActorStop)
+					break
+				}
+				lastCall = call
+				r.processOneRequest(call)
+			case <-r.shutdownCh:
 				r.terminateActor(ErrActorStop)
-				break
 			}
-			lastCall = call
-			r.processOneRequest(call)
 		}
 	}()
 }
@@ -171,8 +178,8 @@ func (r *Actor) stop() *DirectorError {
 	defer r.aliveLock.Unlock()
 	if r.alive {
 		// Pass nil function pointer to stop the message loop
-		r.queue.In <- &ActorCall{reflect.ValueOf((func())(nil)), nil, nil, nil}
 		r.alive = false
+		r.shutdownCh <- true
 	}
 	return nil
 }

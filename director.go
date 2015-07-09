@@ -19,6 +19,13 @@ type DirectorError struct {
 	Message string
 }
 
+func StartActor(actorImpl ActorImplementor) Pid {
+	if DefaultDirector == nil {
+		panic("DefaultDirector not initialized. Call cine.Init first.")
+	}
+	return DefaultDirector.StartActor(actorImpl)
+}
+
 func Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
 	if DefaultDirector == nil {
 		panic("DefaultDirector not initialized. Call cine.Init first.")

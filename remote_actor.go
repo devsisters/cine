@@ -63,7 +63,7 @@ func (r *RemoteActor) stop() *DirectorError {
 	}
 
 	var resp RemoteResponse
-	r.client.Go("DirectorApi.HandleRemoteCast", req, &resp, nil)
+	r.client.Go("DirectorApi.HandleRemoteStop", req, &resp, nil)
 	if resp.Err != nil {
 		return resp.Err
 	}
