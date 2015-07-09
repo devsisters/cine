@@ -11,9 +11,7 @@ asyncronous method call ignoring all errors.
 Actors can communicate with other actors using `Call` and `Cast`. Remote actors
 are treated same as local actors.
 
-This project is originally based on [GLAM][GLAM]
-
-[GLAM]: (https://github.com/areusch/glam)
+This project is originally based on [GLAM](https://github.com/areusch/glam)
 
 Usage
 =====
