@@ -11,17 +11,34 @@ import (
 
 var waitGroup sync.WaitGroup
 
+type PlayerProxy struct {
+	Pid cine.Pid
+}
+
+func (p *PlayerProxy) Start(to cine.Pid) {
+	cine.Call(p.Pid, (*Player).HandleStart, to)
+}
+
+func (p *PlayerProxy) Ping(sender cine.Pid, count int) {
+	cine.Cast(p.Pid, nil, (*Player).HandlePing, sender, count)
+}
+
+func (p *PlayerProxy) Pong(sender cine.Pid, count int) {
+	cine.Cast(p.Pid, nil, (*Player).HandlePong, sender, count)
+}
+
 type Player struct {
 	cine.Actor
 	count int
 }
 
-func (p *Player) Start(to cine.Pid) {
+func (p *Player) HandleStart(to cine.Pid) {
 	log.Println("Start pingpong with", to)
-	cine.Cast(to, make(chan *cine.ActorCall, 1), (*Player).Ping, p.Self(), p.count)
+	otherPlayer := PlayerProxy{Pid: to}
+	otherPlayer.Ping(p.Self(), p.count)
 }
 
-func (p *Player) Ping(sender cine.Pid, count int) {
+func (p *Player) HandlePing(sender cine.Pid, count int) {
 	log.Println(sender, "Ping:", count)
 	if p.count == 10 {
 		log.Println(sender, "Stopping game")
@@ -30,14 +47,19 @@ func (p *Player) Ping(sender cine.Pid, count int) {
 	}
 	time.Sleep(500 * time.Millisecond)
 	p.count += 1
-	cine.Cast(sender, make(chan *cine.ActorCall, 1), (*Player).Pong, p.Self(), p.count)
+
+	otherPlayer := PlayerProxy{Pid: sender}
+	otherPlayer.Pong(p.Self(), p.count)
 }
 
-func (p *Player) Pong(sender cine.Pid, count int) {
+func (p *Player) HandlePong(sender cine.Pid, count int) {
 	log.Println(sender, "Pong:", count)
 	time.Sleep(500 * time.Millisecond)
 	p.count += 1
-	cine.Cast(sender, make(chan *cine.ActorCall, 1), (*Player).Ping, p.Self(), p.count)
+
+	otherPlayer := PlayerProxy{Pid: sender}
+	otherPlayer.Ping(p.Self(), p.count)
+
 	if p.count == 10 {
 		log.Println(sender, "Stopping game")
 		cine.Stop(p.Self())
@@ -63,7 +85,8 @@ func main() {
 	log.Println("pid:", pid)
 	if playerNum == "2" {
 		to := cine.Pid{"127.0.0.1:3000", 1}
-		cine.Call(pid, (*Player).Start, to)
+		myPlayer := PlayerProxy{Pid: pid}
+		myPlayer.Start(to)
 	}
 	waitGroup.Wait()
 }
