@@ -22,6 +22,10 @@ type Actor struct {
 
 const kActorQueueLength int = 1
 
+func (r *Actor) Self() Pid {
+	return r.pid
+}
+
 // call method synchronously calls function in the actor's thread.
 func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError) {
 	r.aliveLock.Lock()
