@@ -140,7 +140,8 @@ func (r *Actor) terminateActor(errReason error) {
 func (r *Actor) startMessageLoop(receiver interface{}) {
 	r.queue = NewMessageQueue(kActorQueueLength)
 	r.receiver = reflect.ValueOf(receiver)
-	r.shutdownCh = make(chan bool)
+	// Make this buffered so the actor can self stop
+	r.shutdownCh = make(chan bool, 1)
 
 	r.aliveLock.Lock()
 	r.alive = true
