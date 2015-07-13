@@ -1,5 +1,7 @@
 Cine
 ====
+[![Circle CI](https://circleci.com/gh/devsisters/cine.svg?style=svg)](https://circleci.com/gh/devsisters/cine)
+
 Actor model for golang.
 
 This project aims to implement actor model from erlang to Go. It attempts to
