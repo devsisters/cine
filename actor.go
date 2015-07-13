@@ -2,6 +2,7 @@ package cine
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"sync"
 
@@ -142,14 +143,14 @@ func (r *Actor) messageLoop() {
 	defer func() {
 		if e := recover(); e != nil {
 			// XXX(serialx): It's weird. The stacktrace is not properly rendered.
-			/*
-				// Actor panicked
-				stacktraceRaw := errors.Wrap(e, 2).ErrorStack()
-				lines := strings.Split(stacktraceRaw, "\n")
-				stacktrace := strings.Trim(strings.Join(lines, "\n    "), " ")
-				log.Printf("actor panic: %v\n%s\n", e, stacktrace)
-			*/
-			errPanic := &PanicError{PanicErr: errors.Wrap(e, 2)}
+
+			// Actor panicked
+			panicErr := errors.Wrap(e, 2)
+			errPanic := &PanicError{PanicErr: panicErr}
+
+			stacktrace := panicErr.ErrorStack()
+			log.Printf("actor panic: %s\n", stacktrace)
+
 			r.terminateActor(errPanic)
 			if lastCall != nil {
 				close(lastCall.Done)
@@ -159,7 +160,10 @@ func (r *Actor) messageLoop() {
 
 	for {
 		select {
-		case call := <-r.queue.Out:
+		case call, ok := <-r.queue.Out:
+			if !ok {
+				break
+			}
 			lastCall = call
 			r.processOneRequest(call)
 		case <-r.shutdownCh:

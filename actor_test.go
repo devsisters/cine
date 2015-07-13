@@ -1,8 +1,11 @@
 package cine
 
 import (
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/go-errors/errors"
 )
 
 type TestActor struct {
@@ -60,7 +63,7 @@ func (a *TestActor) Terminate(errReason error) {
 	} else {
 		panicErr, ok := errReason.(*PanicError)
 		if ok {
-			if panicErr.PanicErr.(int) != a.y {
+			if panicErr.PanicErr.(*errors.Error).Error() != strconv.Itoa(a.y) {
 				a.t.Errorf("Expected PanicError value to be %v but got %v\n", a.y, panicErr.PanicErr)
 			}
 			return
