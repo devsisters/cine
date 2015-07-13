@@ -146,8 +146,14 @@ func (d *Director) startServer() {
 		director: d,
 	}
 	rpc.Register(directorApi)
+
+	_, port, err := net.SplitHostPort(d.nodeName)
+	if err != nil {
+		panic(err)
+	}
+
 	d.server = &http.Server{
-		Addr:           d.nodeName,
+		Addr:           ":" + port,
 		Handler:        rpc,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
