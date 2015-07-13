@@ -135,6 +135,30 @@ func (r *Actor) terminateActor(errReason error) {
 	r.receiver.Interface().(ActorImplementor).Terminate(errReason)
 }
 
+func (r *Actor) messageLoop() {
+	var lastCall *ActorCall
+	defer func() {
+		if e := recover(); e != nil {
+			// Actor panicked
+			errPanic := &PanicError{PanicErr: e}
+			r.terminateActor(errPanic)
+			if lastCall != nil {
+				close(lastCall.Done)
+			}
+		}
+	}()
+
+	for {
+		select {
+		case call := <-r.queue.Out:
+			lastCall = call
+			r.processOneRequest(call)
+		case <-r.shutdownCh:
+			r.terminateActor(ErrActorStop)
+		}
+	}
+}
+
 // startMessageLoop starts the actor thread.
 // This must be called before any actor calls and casts.
 func (r *Actor) startMessageLoop(receiver interface{}) {
@@ -147,35 +171,7 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 	r.alive = true
 	r.aliveLock.Unlock()
 
-	go func() {
-		var lastCall *ActorCall
-		defer func() {
-			if e := recover(); e != nil {
-				// Actor panicked
-				errPanic := &PanicError{PanicErr: e}
-				r.terminateActor(errPanic)
-				if lastCall != nil {
-					close(lastCall.Done)
-				}
-			}
-		}()
-
-		for {
-			select {
-			case call, ok := <-r.queue.Out:
-				if !ok {
-					//// The queue is stopped. We should terminate
-					//r.terminateActor(ErrActorStop)
-					//break
-					continue
-				}
-				lastCall = call
-				r.processOneRequest(call)
-			case <-r.shutdownCh:
-				r.terminateActor(ErrActorStop)
-			}
-		}
-	}()
+	go r.messageLoop()
 }
 
 // stop stops the actor thread.
