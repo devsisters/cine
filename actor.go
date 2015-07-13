@@ -158,11 +158,12 @@ func (r *Actor) messageLoop() {
 		}
 	}()
 
+ForLoop:
 	for {
 		select {
 		case call, ok := <-r.queue.Out:
 			if !ok {
-				break
+				break ForLoop
 			}
 			lastCall = call
 			r.processOneRequest(call)
