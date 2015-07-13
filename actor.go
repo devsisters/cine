@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/go-errors/errors"
 )
 
 type Actor struct {
@@ -139,8 +141,15 @@ func (r *Actor) messageLoop() {
 	var lastCall *ActorCall
 	defer func() {
 		if e := recover(); e != nil {
-			// Actor panicked
-			errPanic := &PanicError{PanicErr: e}
+			// XXX(serialx): It's weird. The stacktrace is not properly rendered.
+			/*
+				// Actor panicked
+				stacktraceRaw := errors.Wrap(e, 2).ErrorStack()
+				lines := strings.Split(stacktraceRaw, "\n")
+				stacktrace := strings.Trim(strings.Join(lines, "\n    "), " ")
+				log.Printf("actor panic: %v\n%s\n", e, stacktrace)
+			*/
+			errPanic := &PanicError{PanicErr: errors.Wrap(e, 2)}
 			r.terminateActor(errPanic)
 			if lastCall != nil {
 				close(lastCall.Done)
