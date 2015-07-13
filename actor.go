@@ -164,9 +164,10 @@ func (r *Actor) startMessageLoop(receiver interface{}) {
 			select {
 			case call, ok := <-r.queue.Out:
 				if !ok {
-					// The queue is stopped. We should terminate
-					r.terminateActor(ErrActorStop)
-					break
+					//// The queue is stopped. We should terminate
+					//r.terminateActor(ErrActorStop)
+					//break
+					continue
 				}
 				lastCall = call
 				r.processOneRequest(call)

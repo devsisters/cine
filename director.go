@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/rpc"
 	"sync"
@@ -17,7 +18,31 @@ func init() {
 }
 
 func Init(nodeName string) {
-	DefaultDirector = NewDirector(nodeName)
+	// TODO(serialx): Thread-safe init?
+	if DefaultDirector == nil {
+		DefaultDirector = NewDirector(nodeName)
+	}
+}
+
+// Ask the kernel for a free open port that is ready to use
+func getPort() int {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		panic(err)
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
+}
+
+func InitForTest() {
+	if DefaultDirector == nil {
+		DefaultDirector = NewDirector(fmt.Sprintf("127.0.0.1:%d", getPort()))
+	}
 }
 
 type DirectorError struct {
