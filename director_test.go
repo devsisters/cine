@@ -1,8 +1,9 @@
 package cine
 
 import (
-	"log"
 	"testing"
+
+	"github.com/golang/glog"
 )
 
 type Phonebook struct {
@@ -23,7 +24,7 @@ func (b *Phonebook) Lookup(name string) (int, bool) {
 }
 
 func (b *Phonebook) Terminate(errReason error) {
-	log.Println("Actor terminated:", errReason)
+	glog.Infoln("Actor terminated:", errReason)
 }
 
 func TestDirector(t *testing.T) {

@@ -3,12 +3,13 @@ package cine
 import (
 	"encoding/gob"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/rpc"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 var DefaultDirector *Director
@@ -162,10 +163,10 @@ func (d *Director) startServer() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		log.Println("Director listening at", d.nodeName)
+		glog.Infoln("Director listening at", d.nodeName)
 		// Partially ensure the director is up before returning
 		wg.Done()
-		log.Fatal(d.server.ListenAndServe())
+		glog.Fatalln(d.server.ListenAndServe())
 	}()
 	wg.Wait()
 }

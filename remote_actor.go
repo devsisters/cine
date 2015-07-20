@@ -1,11 +1,12 @@
 package cine
 
 import (
-	"log"
 	"net/rpc"
 	"reflect"
 	"runtime"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 type RemoteActor struct {
@@ -33,12 +34,12 @@ func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interfa
 	call := r.client.Go("DirectorApi.HandleRemoteCall", req, &resp, nil)
 	<-call.Done
 	if call.Error == rpc.ErrShutdown {
-		log.Println("Remote actor rpc.Client shutdown, returning ErrActorNotFound")
+		glog.Errorln("Remote actor rpc.Client shutdown, returning ErrActorNotFound")
 		r.director.removeClient(r.pid)
 		// TODO(serialx): Add more specific error return
 		return nil, ErrActorNotFound
 	} else if call.Error != nil {
-		log.Printf("Remote actor call failed with: %v, returning ErrActorNotFound\n", call.Error)
+		glog.Errorf("Remote actor call failed with: %v, returning ErrActorNotFound\n", call.Error)
 		// TODO(serialx): Add more specific error return
 		return nil, ErrActorNotFound
 	}

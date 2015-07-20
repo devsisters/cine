@@ -1,9 +1,8 @@
 package main
 
 import (
-	"log"
-
 	"github.com/devsisters/cine"
+	"github.com/golang/glog"
 )
 
 type Phonebook struct {
@@ -31,6 +30,6 @@ func main() {
 	cine.Cast(pid, nil, (*Phonebook).Add, "Jane", 1234)
 	ret, _ := cine.Call(pid, (*Phonebook).Lookup, "Jane")
 	number := ret[0].(int)
-	log.Println("number:", number)
+	glog.Infoln("number:", number)
 	// Out: number: 1234
 }

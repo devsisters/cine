@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/devsisters/cine"
+	"github.com/golang/glog"
 )
 
 var waitGroup sync.WaitGroup
@@ -33,15 +33,15 @@ type Player struct {
 }
 
 func (p *Player) HandleStart(to cine.Pid) {
-	log.Println("Start pingpong with", to)
+	glog.Infoln("Start pingpong with", to)
 	otherPlayer := PlayerProxy{Pid: to}
 	otherPlayer.Ping(p.Self(), p.count)
 }
 
 func (p *Player) HandlePing(sender cine.Pid, count int) {
-	log.Println(sender, "Ping:", count)
+	glog.Infoln(sender, "Ping:", count)
 	if p.count == 10 {
-		log.Println(sender, "Stopping game")
+		glog.Infoln(sender, "Stopping game")
 		cine.Stop(p.Self())
 		return
 	}
@@ -53,7 +53,7 @@ func (p *Player) HandlePing(sender cine.Pid, count int) {
 }
 
 func (p *Player) HandlePong(sender cine.Pid, count int) {
-	log.Println(sender, "Pong:", count)
+	glog.Infoln(sender, "Pong:", count)
 	time.Sleep(500 * time.Millisecond)
 	p.count += 1
 
@@ -61,14 +61,14 @@ func (p *Player) HandlePong(sender cine.Pid, count int) {
 	otherPlayer.Ping(p.Self(), p.count)
 
 	if p.count == 10 {
-		log.Println(sender, "Stopping game")
+		glog.Infoln(sender, "Stopping game")
 		cine.Stop(p.Self())
 		return
 	}
 }
 
 func (p *Player) Terminate(errReason error) {
-	log.Println("Actor terminated:", errReason)
+	glog.Infoln("Actor terminated:", errReason)
 	waitGroup.Done()
 }
 
@@ -82,7 +82,7 @@ func main() {
 	player := Player{cine.Actor{}, 0}
 	waitGroup.Add(1)
 	pid := cine.StartActor(&player)
-	log.Println("pid:", pid)
+	glog.Infoln("pid:", pid)
 	if playerNum == "2" {
 		to := cine.Pid{"127.0.0.1:3000", 1}
 		myPlayer := PlayerProxy{Pid: pid}

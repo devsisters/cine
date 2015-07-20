@@ -2,11 +2,11 @@ package cine
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"sync"
 
 	"github.com/go-errors/errors"
+	"github.com/golang/glog"
 )
 
 type Actor struct {
@@ -149,7 +149,7 @@ func (r *Actor) messageLoop() {
 			errPanic := &PanicError{PanicErr: panicErr}
 
 			stacktrace := panicErr.ErrorStack()
-			log.Printf("actor panic: %s\n", stacktrace)
+			glog.Errorf("actor panic: %s\n", stacktrace)
 
 			r.terminateActor(errPanic)
 			if lastCall != nil {
