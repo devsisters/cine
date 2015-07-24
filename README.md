@@ -22,7 +22,7 @@ Usage
 package main
 
 import (
-	"glog"
+	"github.com/golang/glog"
 
 	"github.com/devsisters/cine"
 )
