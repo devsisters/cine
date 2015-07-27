@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"sync"
 
+	"golang.org/x/net/context"
+
 	"github.com/go-errors/errors"
 	"github.com/golang/glog"
 )
@@ -46,6 +48,12 @@ func (r *Actor) call(function interface{}, args ...interface{}) ([]interface{}, 
 	}
 
 	return response.ReplyAsInterfaces(), nil
+}
+
+// callWithContext function make an assumption that receive function's first argument is context
+func (r *Actor) callWithContext(function interface{}, ctx context.Context, args ...interface{}) ([]interface{}, *DirectorError) {
+	args = append([]interface{}{ctx}, args...)
+	return r.call(function, args...)
 }
 
 // getActor used by Director

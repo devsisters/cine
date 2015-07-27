@@ -5,6 +5,9 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/golang/glog"
 )
@@ -32,23 +35,57 @@ func (r *RemoteActor) call(function interface{}, args ...interface{}) ([]interfa
 
 	var resp RemoteResponse
 	call := r.client.Go("DirectorApi.HandleRemoteCall", req, &resp, nil)
-	<-call.Done
-	if call.Error == rpc.ErrShutdown {
-		glog.Errorln("Remote actor rpc.Client shutdown, returning ErrActorNotFound")
-		r.director.removeClient(r.pid)
-		// TODO(serialx): Add more specific error return
-		return nil, ErrActorNotFound
-	} else if call.Error != nil {
-		glog.Errorf("Remote actor call failed with: %v, returning ErrActorNotFound\n", call.Error)
-		// TODO(serialx): Add more specific error return
-		return nil, ErrActorNotFound
-	}
 
+	err := r.handleCall(call)
+	if err != nil {
+		return nil, err
+	}
 	if resp.Err != nil {
 		return nil, resp.Err
 	}
 
 	return resp.Return, nil
+}
+
+func (r *RemoteActor) callWithContext(function interface{}, ctx context.Context, args ...interface{}) ([]interface{}, *DirectorError) {
+	req := r.createRequest(function, args...)
+	var timeout time.Duration
+	if dl, ok := ctx.Deadline(); ok {
+		timeout = dl.Sub(time.Now())
+		if timeout <= 0 {
+			return nil, &DirectorError{context.DeadlineExceeded.Error()}
+		}
+	}
+	req.Timeout = timeout.String()
+
+	var resp RemoteResponse
+	call := r.client.Go("DirectorApi.HandleRemoteCallWithContext", req, &resp, nil)
+
+	err := r.handleCall(call)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Err != nil {
+		return nil, resp.Err
+	}
+
+	return resp.Return, nil
+}
+
+func (r *RemoteActor) handleCall(call *rpc.Call) *DirectorError {
+	<-call.Done
+	if call.Error == rpc.ErrShutdown {
+		glog.Errorln("Remote actor rpc.Client shutdown, returning ErrActorNotFound")
+		r.director.removeClient(r.pid)
+		// TODO(serialx): Add more specific error return
+		return ErrActorNotFound
+	} else if call.Error != nil {
+		glog.Errorf("Remote actor call failed with: %v, returning ErrActorNotFound\n", call.Error)
+		// TODO(serialx): Add more specific error return
+		return ErrActorNotFound
+	}
+
+	return nil
 }
 
 func (r *RemoteActor) cast(done chan *ActorCall, function interface{}, args ...interface{}) {

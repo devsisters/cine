@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/golang/glog"
 )
 
@@ -64,6 +66,13 @@ func Call(pid Pid, function interface{}, args ...interface{}) ([]interface{}, *D
 	return DefaultDirector.Call(pid, function, args...)
 }
 
+func CallWithContext(pid Pid, function interface{}, ctx context.Context, args ...interface{}) ([]interface{}, *DirectorError) {
+	if DefaultDirector == nil {
+		panic("DefaultDirector not initialized. Call cine.Init first.")
+	}
+	return DefaultDirector.CallWithContext(pid, function, ctx, args...)
+}
+
 func Cast(pid Pid, done chan *ActorCall, function interface{}, args ...interface{}) {
 	if DefaultDirector == nil {
 		panic("DefaultDirector not initialized. Call cine.Init first.")
@@ -108,6 +117,7 @@ type ActorImplementor interface {
 type actorLike interface {
 	call(function interface{}, args ...interface{}) ([]interface{}, *DirectorError)
 	cast(done chan *ActorCall, function interface{}, args ...interface{})
+	callWithContext(function interface{}, ctx context.Context, args ...interface{}) ([]interface{}, *DirectorError)
 	stop() *DirectorError
 }
 
@@ -267,6 +277,28 @@ func (d *Director) Cast(pid Pid, done chan *ActorCall, function interface{}, arg
 	actor.cast(done, function, args...)
 }
 
+func (d *Director) CallWithContext(pid Pid, function interface{}, ctx context.Context, args ...interface{}) ([]interface{}, *DirectorError) {
+	actor, err := d.actorFromPid(pid)
+	if err != nil {
+		return nil, ErrActorNotFound
+	}
+
+	type Return struct {
+		ret []interface{}
+		err *DirectorError
+	}
+	c := make(chan Return, 1)
+	go func() { ret, err := actor.callWithContext(function, ctx, args...); c <- Return{ret: ret, err: err} }()
+	select {
+	case <-ctx.Done():
+		return nil, &DirectorError{ctx.Err().Error()}
+	case ret := <-c:
+		return ret.ret, ret.err
+	}
+
+	return actor.callWithContext(function, ctx, args...)
+}
+
 func (d *Director) Stop(pid Pid) *DirectorError {
 	actor, err := d.actorFromPid(pid)
 	if err != nil {
@@ -284,6 +316,7 @@ type RemoteRequest struct {
 	Pid          Pid
 	FunctionName string
 	Args         []interface{}
+	Timeout      string
 }
 
 type RemoteResponse struct {
@@ -313,6 +346,30 @@ func (d *DirectorApi) HandleRemoteCall(r RemoteRequest, reply *RemoteResponse) e
 		return nil
 	}
 	ret, err := d.director.Call(r.Pid, fun, r.Args...)
+	if err != nil {
+		reply.Err = err
+		return nil
+	}
+	reply.Return = ret
+	return nil
+}
+
+func (d *DirectorApi) HandleRemoteCallWithContext(r RemoteRequest, reply *RemoteResponse) error {
+	fun, err := d.findFun(r)
+	if err != nil {
+		reply.Err = err
+		return nil
+	}
+	// construct context
+	timeout, parseErr := time.ParseDuration(r.Timeout)
+	if parseErr != nil {
+		reply.Err = &DirectorError{parseErr.Error()}
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ret, err := d.director.CallWithContext(r.Pid, fun, ctx, r.Args...)
 	if err != nil {
 		reply.Err = err
 		return nil
