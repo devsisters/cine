@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 )
 
 type Phonebook struct {
@@ -36,7 +36,7 @@ func (b *Phonebook) Lookup(name string) (int, bool) {
 }
 
 func (b *Phonebook) Terminate(errReason error) {
-	glog.Infoln("Actor terminated:", errReason)
+	log.Infoln("Actor terminated:", errReason)
 }
 
 func TestDirector(t *testing.T) {

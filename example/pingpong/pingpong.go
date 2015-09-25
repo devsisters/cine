@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/devsisters/cine"
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 )
 
 var waitGroup sync.WaitGroup
@@ -33,15 +33,15 @@ type Player struct {
 }
 
 func (p *Player) HandleStart(to cine.Pid) {
-	glog.Infoln("Start pingpong with", to)
+	log.Infoln("Start pingpong with", to)
 	otherPlayer := PlayerProxy{Pid: to}
 	otherPlayer.Ping(p.Self(), p.count)
 }
 
 func (p *Player) HandlePing(sender cine.Pid, count int) {
-	glog.Infoln(sender, "Ping:", count)
+	log.Infoln(sender, "Ping:", count)
 	if p.count == 10 {
-		glog.Infoln(sender, "Stopping game")
+		log.Infoln(sender, "Stopping game")
 		cine.Stop(p.Self())
 		return
 	}
@@ -53,7 +53,7 @@ func (p *Player) HandlePing(sender cine.Pid, count int) {
 }
 
 func (p *Player) HandlePong(sender cine.Pid, count int) {
-	glog.Infoln(sender, "Pong:", count)
+	log.Infoln(sender, "Pong:", count)
 	time.Sleep(500 * time.Millisecond)
 	p.count += 1
 
@@ -61,14 +61,14 @@ func (p *Player) HandlePong(sender cine.Pid, count int) {
 	otherPlayer.Ping(p.Self(), p.count)
 
 	if p.count == 10 {
-		glog.Infoln(sender, "Stopping game")
+		log.Infoln(sender, "Stopping game")
 		cine.Stop(p.Self())
 		return
 	}
 }
 
 func (p *Player) Terminate(errReason error) {
-	glog.Infoln("Actor terminated:", errReason)
+	log.Infoln("Actor terminated:", errReason)
 	waitGroup.Done()
 }
 
@@ -82,7 +82,7 @@ func main() {
 	player := Player{cine.Actor{}, 0}
 	waitGroup.Add(1)
 	pid := cine.StartActor(&player)
-	glog.Infoln("pid:", pid)
+	log.Infoln("pid:", pid)
 	if playerNum == "2" {
 		to := cine.Pid{"127.0.0.1:3000", 1}
 		myPlayer := PlayerProxy{Pid: pid}

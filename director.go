@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 )
 
 var DefaultDirector *Director
@@ -173,10 +173,10 @@ func (d *Director) startServer() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		glog.Infoln("Director listening at", d.nodeName)
+		log.Infoln("Director listening at", d.nodeName)
 		// Partially ensure the director is up before returning
 		wg.Done()
-		glog.Fatalln(d.server.ListenAndServe())
+		log.Fatalln(d.server.ListenAndServe())
 	}()
 	wg.Wait()
 }

@@ -22,7 +22,7 @@ Usage
 package main
 
 import (
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/devsisters/cine"
 )
@@ -52,7 +52,7 @@ func main() {
 	cine.Cast(pid, nil, (*Phonebook).Add, "Jane", 1234)
 	ret, _ := cine.Call(pid, (*Phonebook).Lookup, "Jane")
 	number := ret[0].(int)
-	glog.Infoln("number:", number)
+	log.Infoln("number:", number)
 	// Out: number: 1234
 }
 ```

@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 )
 
 type RemoteActor struct {
@@ -75,12 +75,12 @@ func (r *RemoteActor) callWithContext(function interface{}, ctx context.Context,
 func (r *RemoteActor) handleCall(call *rpc.Call) *DirectorError {
 	<-call.Done
 	if call.Error == rpc.ErrShutdown {
-		glog.Errorln("Remote actor rpc.Client shutdown, returning ErrActorNotFound")
+		log.Errorln("Remote actor rpc.Client shutdown, returning ErrActorNotFound")
 		r.director.removeClient(r.pid)
 		// TODO(serialx): Add more specific error return
 		return ErrActorNotFound
 	} else if call.Error != nil {
-		glog.Errorf("Remote actor call failed with: %v, returning ErrActorNotFound\n", call.Error)
+		log.Errorf("Remote actor call failed with: %v, returning ErrActorNotFound\n", call.Error)
 		// TODO(serialx): Add more specific error return
 		return ErrActorNotFound
 	}

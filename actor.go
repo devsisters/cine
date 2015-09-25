@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/go-errors/errors"
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 )
 
 type Actor struct {
@@ -157,7 +157,7 @@ func (r *Actor) messageLoop() {
 			errPanic := &PanicError{PanicErr: panicErr}
 
 			stacktrace := panicErr.ErrorStack()
-			glog.Errorf("actor panic: %s\n", stacktrace)
+			log.Errorf("actor panic: %s\n", stacktrace)
 
 			r.terminateActor(errPanic)
 			if lastCall != nil {
