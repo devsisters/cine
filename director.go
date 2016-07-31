@@ -15,16 +15,16 @@ import (
 )
 
 var DefaultDirector *Director
+var initOnce sync.Once
 
 func init() {
 	gob.Register(Pid{})
 }
 
 func Init(nodeName string) {
-	// TODO(serialx): Thread-safe init?
-	if DefaultDirector == nil {
+	initOnce.Do(func() {
 		DefaultDirector = NewDirector(nodeName)
-	}
+	})
 }
 
 // Ask the kernel for a free open port that is ready to use
